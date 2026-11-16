@@ -43,8 +43,7 @@ gateway's test secret.
 ## Before going live
 
 1. Set the Turnstile widget's secret key on the gateway (`npx wrangler secret put TURNSTILE_SECRET_KEY`).
-2. Set `apiBase` to where the gateway answers: its `workers.dev` address, or `https://tseriz.com`
-   once `tseriz.com/api/*` is routed to it.
+2. Once `tseriz.com/api/*` is routed to the gateway, change `apiBase` to `https://tseriz.com`.
 3. In this repository's **Settings → Pages**, publish from the default branch, root folder. The
    `CNAME` file asks for `tseriz.gzarruk.com`; add a `CNAME` DNS record for `tseriz` pointing to
    `gzarruk.github.io`.
