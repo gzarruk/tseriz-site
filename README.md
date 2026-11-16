@@ -36,12 +36,13 @@ gateway, and serve this directory:
 python3 -m http.server 8000
 ```
 
-The Turnstile key in `assets/config.js` is Cloudflare's always-pass test key, which works with the
+The real Turnstile site key only works on the widget's hostnames, so for local testing put
+Cloudflare's always-pass test key, `1x00000000000000000000AA`, in `assets/config.js`; it works with the
 gateway's test secret.
 
 ## Before going live
 
-1. Put the real Turnstile site key in `assets/config.js` (the secret goes on the gateway).
+1. Set the Turnstile widget's secret key on the gateway (`npx wrangler secret put TURNSTILE_SECRET_KEY`).
 2. Set `apiBase` to where the gateway answers: its `workers.dev` address, or `https://tseriz.com`
    once `tseriz.com/api/*` is routed to it.
 3. In this repository's **Settings → Pages**, publish from the default branch, root folder. The
