@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tseriz: try synthetic time series</title>
+  <meta name="description" content="Generate a synthetic time series in your browser, no account needed: noise, trends, oscillations and faults, with a chart and a CSV download.">
+  <link rel="stylesheet" href="assets/style.css">
+  <script type="module" src="assets/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.11/dist/cdn.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/plotly.js-basic-dist-min@3.7.0/plotly-basic.min.js"></script>
+  <script>window.onTurnstileLoad = () => window.dispatchEvent(new Event("turnstile-ready"));</script>
+  <script async defer src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad"></script>
+</head>
+<body>
+<main x-data="tryIt" class="page">
+  <header class="hero">
+    <a class="brand" href="./">tseriz</a>
+    <h1>Synthetic time series, in seconds</h1>
+    <p>Pick an example or set up your own signal, then generate it. No account needed for series up to
+      <strong x-text="limits.max_inline_points.toLocaleString()">10,000</strong> points.</p>
+  </header>
+
+  <section aria-labelledby="examples-heading">
+    <h2 id="examples-heading">Start from an example</h2>
+    <div class="gallery">
+      <template x-for="preset in presets" :key="preset.slug">
+        <button type="button" class="card" :disabled="busy || !presetFits(preset)" @click="generatePreset(preset)">
+          <svg class="spark" viewBox="0 0 80 24" preserveAspectRatio="none" aria-hidden="true">
+            <polyline :points="preset.thumbnail.map((v, i) => `${i},${23 - v * 22}`).join(' ')"></polyline>
+          </svg>
+          <span class="card-title" x-text="preset.name"></span>
+          <span class="card-text" x-text="preset.description"></span>
+          <span class="badge" x-show="!presetFits(preset)">Needs a free account</span>
+        </button>
+      </template>
+    </div>
+  </section>
+
+  <section aria-labelledby="form-heading">
+    <h2 id="form-heading">Or build your own</h2>
+    <form class="panel" @submit.prevent="generateForm()">
+      <div class="row">
+        <label>Duration
+          <span class="pair">
+            <input type="number" min="1" step="any" required x-model.number="form.duration">
+            <select x-model="form.durationUnit">
+              <option>seconds</option><option>minutes</option><option>hours</option><option>days</option>
+            </select>
+          </span>
+        </label>
+        <label>Sampling rate (Hz)
+          <input type="number" min="0.0001" step="any" required x-model.number="form.samplingHz">
+        </label>
+        <label>Seed (optional)
+          <input type="number" min="0" max="4294967295" step="1" placeholder="random" x-model="form.seed">
+        </label>
+      </div>
+
+      <template x-for="(channel, index) in form.channels" :key="index">
+        <fieldset class="channel">
+          <legend>
+            <input class="channel-name" aria-label="Channel name" x-model="channel.name">
+            <button type="button" class="link" x-show="form.channels.length > 1" @click="removeChannel(index)">Remove</button>
+          </legend>
+          <div class="row">
+            <label>Mean <input type="number" step="any" x-model.number="channel.mean"></label>
+            <label>Noise <input type="number" min="0" step="any" x-model.number="channel.noise"></label>
+            <label>Trend per hour <input type="number" step="any" x-model.number="channel.trendPerHour"></label>
+          </div>
+          <div class="row">
+            <label>Oscillation period (s) <input type="number" min="0" step="any" x-model.number="channel.periodSeconds"></label>
+            <label>Oscillation amplitude <input type="number" min="0" step="any" x-model.number="channel.amplitude"></label>
+            <label>Fault
+              <select x-model="channel.fault">
+                <option value="none">None</option>
+                <option value="gap">Data gap</option>
+                <option value="spikes">Spikes</option>
+                <option value="impact">Impact (damped ring)</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+      </template>
+
+      <div class="actions">
+        <button type="button" class="secondary" x-show="form.channels.length < limits.max_channels" @click="addChannel()">Add a channel</button>
+        <span class="estimate" :class="overLimit && 'over'">
+          <span x-text="points.toLocaleString()"></span> points
+          <template x-if="overLimit"><span> — over the <span x-text="limits.max_inline_points.toLocaleString()"></span> limit without an account</span></template>
+        </span>
+        <button type="submit" class="primary" :disabled="busy || overLimit" x-text="busy ? 'Generating…' : 'Generate'">Generate</button>
+      </div>
+      <div x-ref="turnstile" class="turnstile"></div>
+    </form>
+  </section>
+
+  <p class="error" role="alert" x-show="error" x-text="error"></p>
+
+  <section aria-live="polite" x-show="result" x-cloak>
+    <div class="result-head">
+      <h2 x-text="title"></h2>
+      <span class="muted" x-text="summary"></span>
+      <button type="button" class="primary" @click="download()">Download CSV</button>
+    </div>
+    <div x-ref="chart" class="chart"></div>
+
+    <aside class="upsell">
+      <h3>Want more?</h3>
+      <p>A free account lifts the limits on this page:</p>
+      <ul>
+        <li>Series up to 200,000 points, with up to 10 channels</li>
+        <li>Every component: coloured and correlated noise, ramps, transient trains, ghosts</li>
+        <li>An API key, to generate from your own code</li>
+        <li>Saved series and an AI assistant that writes configs from a description</li>
+      </ul>
+      <a class="primary" :href="signupUrl">Create a free account</a>
+    </aside>
+  </section>
+
+  <footer class="footer">
+    <p>Each series is generated on request and not stored. A quick bot check protects the free tier.
+      Made by <a href="https://gzarruk.com">Gustavo Zarruk</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
